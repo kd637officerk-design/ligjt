@@ -16,49 +16,40 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Download the repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Install Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
-      # 3. Install Java for Android
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      # 4. Install Android SDK
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
         with:
           packages: 'platform-tools'
 
-      # 5. Install project dependencies
       - name: Install dependencies
-        run: npm install
+        run: npm install --legacy-peer-deps
 
-      # 6. Build the web application
       - name: Build web application
         run: npm run build
 
-      # 7. Synchronize Capacitor with Android
       - name: Sync Capacitor
         run: npx cap sync android
 
-      # 8. Build the Android APK
-      - name: Build APK
+      - name: Build Android APK
         working-directory: android
         run: |
           chmod +x gradlew
           ./gradlew --no-daemon assembleDebug
 
-      # 9. Upload the APK to GitHub
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
