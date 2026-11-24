@@ -8,11 +8,11 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="description" content="#XI — Clean Media Player with embedded Wallpapers, 45 Collectible Holo Cards, 61 Themes, and DIY Theme Studio." />
-  <meta property="og:title" content="#XI — Hyper-Realistic Media Deck" />
-  <meta property="og:description" content="Pure HTML media player with Wallpapers and DIY Theme Studio built in." />
+  <meta property="og:title" content="SOWRA — Sharp Media" />
+  <meta property="og:description" content="SOWRA — Sharp Media Player" />
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png" />
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-  <title>#XI — Hyper-Realistic Media Deck</title>
+  <title>SOWRA — Sharp Media</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Cinzel:wght@600;700;800&family=Cormorant+Garamond:wght@600;700&family=IM+Fell+English:ital@0;1&family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet" />
@@ -6091,9 +6091,9 @@ function startFxLoop(canvasEl, theme, fxLevel, wetGlass) {
     if (typeof navigator !== 'undefined' && 'mediaSession' in navigator) {
       try {
         navigator.mediaSession.metadata = new MediaMetadata({
-          title: meta.title || '#XI Media Deck',
-          artist: meta.artist || '#XI Player',
-          album: meta.album || '#XI',
+          title: meta.title || 'SOWRA',
+          artist: meta.artist || 'Local Media',
+          album: meta.album || 'SOWRA',
           artwork: [
             { src: art, sizes: '512x512', type: 'image/jpeg' },
             { src: art, sizes: '256x256', type: 'image/jpeg' },
@@ -6114,10 +6114,11 @@ function startFxLoop(canvasEl, theme, fxLevel, wetGlass) {
       if (meta.isStopped && am.stopNotification) am.stopNotification().catch(function(){});
       else if (am.updateMetadata) {
         am.updateMetadata({
-          title: meta.title || '#XI Media Deck',
-          artist: meta.artist || '#XI Player',
-          album: meta.album || '#XI',
+          title: meta.title || 'SOWRA',
+          artist: meta.artist || 'Local Media',
+          album: meta.album || 'SOWRA',
           artworkUrl: art.startsWith('data:') || art.startsWith('http') ? art : toAbsUrl(art),
+          artworkPath: meta.artworkPath || '',
           isPlaying: !!meta.isPlaying,
           durationMs: Math.max(0, Math.round((meta.durationSec || 0) * 1000)),
           positionMs: Math.max(0, Math.round((meta.positionSec || 0) * 1000)),
@@ -6167,14 +6168,21 @@ function startFxLoop(canvasEl, theme, fxLevel, wetGlass) {
     var cap = window.Capacitor;
     return (res.files || []).map(function(f) {
       return {
+        nativeId: f.id || '',
         name: f.name,
         artist: f.artist || '',
         album: f.album || '',
         folder: f.folder || '',
         kind: f.kind === 'video' ? 'video' : 'audio',
-        uri: f.uri.startsWith('content://') ? f.uri : (cap.convertFileSrc ? cap.convertFileSrc(f.uri) : f.uri),
+        uri: f.uri,
+        artworkPath: f.artworkPath || '',
+        artworkUri: f.artworkPath ? (cap.convertFileSrc ? cap.convertFileSrc('file://' + f.artworkPath) : ('file://' + f.artworkPath)) : '',
         size: f.size || 0,
         duration: f.duration || 0,
+        year: f.year || 0,
+        trackNumber: f.trackNumber || 0,
+        dateAdded: f.dateAdded || 0,
+        dateModified: f.dateModified || 0,
       };
     });
   }
@@ -6324,6 +6332,7 @@ function startFxLoop(canvasEl, theme, fxLevel, wetGlass) {
     backdropOverride: '',
     equippedWallId: '',
     autoSortMode: 'off', // 'off' | 'genre' | 'year' | 'decade' | 'both'
+    trackSort: 'addedDesc',
     eqMode: 'bars', // 'bars' | 'mirror' | 'led'
     bgProfiles: cloneDefaultBgProfiles(),
   };
@@ -6603,6 +6612,10 @@ function startFxLoop(canvasEl, theme, fxLevel, wetGlass) {
   // Cover URL helper
   function getTrackCover(tr) {
     if (!tr) return DEFAULT_COVER_ART;
+    if (tr.artworkUri) {
+      if (coverUrls[tr.id] !== tr.artworkUri) coverUrls[tr.id] = tr.artworkUri;
+      return tr.artworkUri;
+    }
     if (coverUrls[tr.id]) return coverUrls[tr.id];
     var b = tr.cov || tr.th;
     if (b instanceof Blob && b.size > 0) {
@@ -7036,7 +7049,7 @@ function startFxLoop(canvasEl, theme, fxLevel, wetGlass) {
       var th = getActiveTheme();
       syncSystemMediaMetadata({
         title: tr.name, artist: tr.artist || th.label, album: tr.album || th.label,
-        artworkUrl: getTrackCover(tr), isPlaying: false, isStopped: true, durationSec: liveDur, positionSec: curTime
+        artworkUrl: getTrackCover(tr), artworkPath: tr.artworkPath || '', isPlaying: false, isStopped: true, durationSec: liveDur, positionSec: curTime
       });
     }
     showToast(remember ? 'Stopped (position saved)' : 'Playback stopped');
@@ -7276,6 +7289,7 @@ function startFxLoop(canvasEl, theme, fxLevel, wetGlass) {
         artist: tr.artist || (th.label + ' · #XI'),
         album: tr.album || tr.folder || th.label,
         artworkUrl: cover,
+        artworkPath: tr.artworkPath || '',
         isPlaying: playing,
         durationSec: d,
         positionSec: curTime,
@@ -7402,7 +7416,7 @@ function startFxLoop(canvasEl, theme, fxLevel, wetGlass) {
     if (tr) {
       syncSystemMediaMetadata({
         title: tr.name, artist: tr.artist || 'XI Cinema Video', album: tr.folder || 'Videos',
-        artworkUrl: getTrackCover(tr), isPlaying: vidPlaying, durationSec: vidDur, positionSec: vidCurTime, playbackRate: state.rate || 1
+        artworkUrl: getTrackCover(tr), artworkPath: tr.artworkPath || '', isPlaying: vidPlaying, durationSec: vidDur, positionSec: vidCurTime, playbackRate: state.rate || 1
       });
     }
   }
@@ -7484,30 +7498,89 @@ function startFxLoop(canvasEl, theme, fxLevel, wetGlass) {
     }
   }
 
-  async function scanInternalStorage() {
+  async function scanInternalStorage(silent) {
     if (isNativeAndroid()) {
       try {
-        showToast('Scanning phone internal storage...');
+        if (!silent) showToast('Scanning your music library...');
+        var inf = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.InternalFiles;
+        if (inf && inf.requestNotificationPermission) inf.requestNotificationPermission().catch(function(){});
         var scanned = await scanNativeInternalFiles();
-        if (!scanned || !scanned.length) { showToast('No internal audio/video files found'); return; }
-        var seen = new Set(tracks.map(function(t) { return t.url; }).filter(Boolean));
-        var added = 0, autoBooks = 0, baseId = Date.now();
+        if (!scanned) throw new Error('Native media scanner unavailable');
+        var seenUris = new Set();
+        var existingByUri = {};
+        tracks.forEach(function(t) { if (t.url) existingByUri[t.url] = t; });
+        var added = 0, updated = 0, autoBooks = 0, baseId = Date.now();
         for (var i = 0; i < scanned.length; i++) {
           var f = scanned[i];
-          if (seen.has(f.uri)) continue;
+          seenUris.add(f.uri);
+          var existing = existingByUri[f.uri];
           var isLongAudio = f.kind === 'audio' && (f.duration || 0) > AUDIOBOOK_MIN_SEC;
           var fk = isLongAudio ? 'book' : f.kind;
           if (isLongAudio) autoBooks++;
-          var tr = { id: baseId + i, name: f.name, artist: f.artist, album: f.album, folder: f.folder, kind: fk, url: f.uri, local: 1, sz: f.size, dur: f.duration, vd: f.kind === 'video' ? f.duration : undefined, addedAt: Date.now() + i };
-          await idbPut('tracks', tr);
-          tracks.unshift(tr);
-          added++;
+          if (existing) {
+            existing.name = f.name || existing.name;
+            existing.artist = f.artist || existing.artist || '';
+            existing.album = f.album || existing.album || '';
+            existing.folder = f.folder || existing.folder || 'Internal Storage/Music';
+            existing.dur = f.duration || existing.dur || 0;
+            existing.sz = f.size || existing.sz || 0;
+            if (f.artworkUri && f.artworkUri !== existing.artworkUri) delete coverUrls[existing.id];
+            existing.artworkPath = f.artworkPath || existing.artworkPath || '';
+            existing.artworkUri = f.artworkUri || existing.artworkUri || '';
+            existing.year = f.year || existing.year || 0;
+            existing.trackNumber = f.trackNumber || existing.trackNumber || 0;
+            existing.dateAdded = f.dateAdded || existing.dateAdded || 0;
+            existing.dateModified = f.dateModified || existing.dateModified || 0;
+            existing.nativeMediaStore = 1;
+            if (fk === 'book' && existing.kind === 'audio') existing.kind = 'book';
+            await idbPut('tracks', existing);
+            updated++;
+          } else {
+            var tr = {
+              id: f.nativeId || ('sowra:' + baseId + ':' + i),
+              name: f.name,
+              artist: f.artist || '',
+              album: f.album || '',
+              folder: f.folder || 'Internal Storage/Music',
+              kind: fk,
+              url: f.uri,
+              local: 1,
+              sz: f.size || 0,
+              dur: f.duration || 0,
+              vd: f.kind === 'video' ? f.duration : undefined,
+              artworkPath: f.artworkPath || '',
+              artworkUri: f.artworkUri || '',
+              year: f.year || 0,
+              trackNumber: f.trackNumber || 0,
+              dateAdded: f.dateAdded || 0,
+              dateModified: f.dateModified || 0,
+              nativeMediaStore: 1,
+              addedAt: Date.now() + i
+            };
+            await idbPut('tracks', tr);
+            tracks.unshift(tr);
+            added++;
+          }
         }
+        var removed = 0;
+        var kept = [];
+        for (var j = 0; j < tracks.length; j++) {
+          var item = tracks[j];
+          if (item.nativeMediaStore && item.url && !seenUris.has(item.url)) {
+            await idbDelete('tracks', item.id);
+            delete coverUrls[item.id];
+            removed++;
+          } else kept.push(item);
+        }
+        tracks = kept;
+        if (state.autoSortMode && state.autoSortMode !== 'off') autoSortPlaylists(state.autoSortMode, { silent: true });
         renderMain(); updatePlaybackUi();
-        showToast(added > 0 ? (autoBooks > 0 ? ('Imported ' + added + ' files (' + autoBooks + ' >40m Audiobook)') : ('Imported ' + added + ' internal files')) : 'Internal storage up to date');
+        showToast('SOWRA scan: ' + scanned.length + ' found · ' + added + ' added · ' + removed + ' removed');
         return;
       } catch (err) {
-        showToast('Using folder picker...');
+        if (silent) return;
+        showToast('Could not scan phone storage: ' + (err && err.message ? err.message : 'permission required'));
+        return;
       }
     }
     if (window.showDirectoryPicker) {
@@ -7575,6 +7648,33 @@ function startFxLoop(canvasEl, theme, fxLevel, wetGlass) {
   });
 
   // Main Library & Header Rendering
+  function sortLibraryTracks(list) {
+    var mode = state.trackSort || 'addedDesc';
+    var str = function(v) { return String(v || '').toLocaleLowerCase(); };
+    var num = function(v) { return Number(v || 0); };
+    var compare = function(a, b, key, dir) {
+      var av = key === 'title' ? str(a.name) : key === 'artist' ? str(a.artist) :
+        key === 'album' ? str(a.album) : key === 'duration' ? num(a.dur || a.vd) :
+        key === 'year' ? num(a.year) : key === 'size' ? num(a.sz) :
+        key === 'dateAdded' ? num(a.dateAdded ? a.dateAdded * 1000 : a.addedAt) : num(a.dateModified ? a.dateModified * 1000 : (a.dateAdded ? a.dateAdded * 1000 : a.addedAt));
+      var bv = key === 'title' ? str(b.name) : key === 'artist' ? str(b.artist) :
+        key === 'album' ? str(b.album) : key === 'duration' ? num(b.dur || b.vd) :
+        key === 'year' ? num(b.year) : key === 'size' ? num(b.sz) :
+        key === 'dateAdded' ? num(b.dateAdded ? b.dateAdded * 1000 : b.addedAt) : num(b.dateModified ? b.dateModified * 1000 : (b.dateAdded ? b.dateAdded * 1000 : b.addedAt));
+      var result = typeof av === 'string' ? av.localeCompare(bv) : av - bv;
+      return dir === 'desc' ? -result : result;
+    };
+    var parts = mode.match(/^(title|artist|album|duration|year|size|dateAdded|dateModified)(Asc|Desc)$/);
+    if (!parts) return list;
+    var key = parts[1], dir = parts[2].toLowerCase();
+    return list.sort(function(a,b) { return compare(a,b,key,dir); });
+  }
+  window.__sowraSetTrackSort = function(value) {
+    state.trackSort = value;
+    persistState();
+    renderMain();
+  };
+
   function renderMain() {
     var th = getActiveTheme();
     var pCls = themePanelClasses(th);
@@ -7822,7 +7922,24 @@ function startFxLoop(canvasEl, theme, fxLevel, wetGlass) {
       });
     }
 
+    if (!isPlaylistDetail) list = sortLibraryTracks(list);
     var prefixHtml = '';
+    if (!isPlaylistDetail && list.length) {
+      var sortOptions = [
+        ['addedDesc','Date added · newest'],['addedAsc','Date added · oldest'],
+        ['titleAsc','Title · A to Z'],['titleDesc','Title · Z to A'],
+        ['artistAsc','Artist · A to Z'],['artistDesc','Artist · Z to A'],
+        ['albumAsc','Album · A to Z'],['albumDesc','Album · Z to A'],
+        ['durationAsc','Duration · shortest'],['durationDesc','Duration · longest'],
+        ['yearAsc','Year · oldest'],['yearDesc','Year · newest'],
+        ['sizeDesc','File size · largest'],['dateModifiedDesc','Modified · newest']
+      ];
+      prefixHtml = '<div class="pl-header"><span style="font-size:.78rem;font-weight:800;color:var(--mu)">SOWRA LIBRARY · ' + list.length + ' ITEMS</span>' +
+        '<div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">' +
+        '<select aria-label="Sort music library" onchange="window.__sowraSetTrackSort(this.value)" style="max-width:170px;background:var(--chip);color:var(--fg);border:1px solid var(--mat-border);border-radius:10px;padding:8px;font:inherit;font-size:.72rem">' +
+        sortOptions.map(function(o){ return '<option value="' + o[0] + '"' + ((state.trackSort || 'addedDesc') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') +
+        '</select><button type="button" class="btn-ghost" id="sowra-scan-library">↻ Scan</button></div></div>';
+    }
     if (isPlaylistDetail) {
       prefixHtml = '<div class="pl-header"><button type="button" class="btn-ghost" id="back-pl-btn">← All Playlists</button><span style="font-weight:800;flex:1;margin:0 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + escHtml(curPl ? curPl.name : '') + '</span>' +
         (list.length > 1 ? '<span class="pl-hint">Drag ⋮⋮ to reorder</span>' : '') +
@@ -7844,6 +7961,8 @@ function startFxLoop(canvasEl, theme, fxLevel, wetGlass) {
           '<button type="button" class="btn-ghost" id="empty-diy">🎨 DIY Themes</button>' +
         '</div>' +
       '</div>';
+      var emptyScanBtn = $('empty-scan');
+      if (emptyScanBtn) emptyScanBtn.addEventListener('click', function() { scanInternalStorage(false); });
       return;
     }
 
@@ -7856,6 +7975,8 @@ function startFxLoop(canvasEl, theme, fxLevel, wetGlass) {
       container.innerHTML = prefixHtml + '<div class="tracks-grid">' + list.map(function(tr) {
         return renderTrackRowHtml(tr, activeId);
       }).join('') + '</div>';
+      var scanBtn = $('sowra-scan-library');
+      if (scanBtn) scanBtn.addEventListener('click', function() { scanInternalStorage(false); });
     }
   }
 
@@ -9935,6 +10056,11 @@ function startFxLoop(canvasEl, theme, fxLevel, wetGlass) {
     applyThemeStylesAndScene();
     renderMain();
     updatePlaybackUi();
+
+    // SOWRA: request Android media access and reconcile the phone library on launch.
+    if (isNativeAndroid()) {
+      setTimeout(function() { scanInternalStorage(true); }, 900);
+    }
 
     // Wallpaper Auto-Rotate check
     if (wallAuto.activeId && wallAuto.intervalHours > 0) {

@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">XI Media Deck</string>
-    <string name="title_activity_main">XI Media Deck</string>
+    <string name="app_name">SOWRA</string>
+    <string name="title_activity_main">SOWRA</string>
     <string name="package_name">com.xideck.mediaplayer</string>
     <string name="custom_url_scheme">com.xideck.mediaplayer</string>
 </resources>

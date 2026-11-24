@@ -10,6 +10,7 @@ import android.content.pm.ServiceInfo;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.drawable.Icon;
+import java.io.File;
 import android.media.MediaMetadata;
 import android.media.session.MediaSession;
 import android.media.session.PlaybackState;
@@ -28,17 +29,21 @@ public class MediaPlaybackService extends Service {
     public static final String ACTION_CMD_RERUN = "com.xideck.mediaplayer.CMD_RERUN";
     public static final String ACTION_CMD_PREV = "com.xideck.mediaplayer.CMD_PREV";
     public static final String ACTION_CMD_NEXT = "com.xideck.mediaplayer.CMD_NEXT";
+    public static final String ACTION_CMD_REWIND = "com.xideck.mediaplayer.CMD_REWIND";
+    public static final String ACTION_CMD_FAST_FORWARD = "com.xideck.mediaplayer.CMD_FAST_FORWARD";
 
     private MediaSession mediaSession;
     private NotificationManager notificationManager;
     private Bitmap coverBitmap;
 
-    private String curTitle = "XI Media Deck";
+    private String curTitle = "SOWRA";
     private String curArtist = "Ready";
-    private String curAlbum = "Eternia Player";
+    private String curAlbum = "SOWRA";
     private boolean curPlaying = false;
     private long curDurationMs = 0L;
     private long curPositionMs = 0L;
+    private String curArtworkPath = "";
+    private String loadedArtworkPath = null;
 
     @Override
     public void onCreate() {
@@ -90,7 +95,7 @@ public class MediaPlaybackService extends Service {
 
             @Override
             public void onSeekTo(long pos) {
-                AndroidMediaPlugin.emitMediaAction("seekto", pos / 1000.0);
+                AndroidMediaPlugin.emitMediaAction("seekto", pos);
             }
         });
         mediaSession.setActive(true);
@@ -119,13 +124,21 @@ public class MediaPlaybackService extends Service {
             AndroidMediaPlugin.emitMediaAction("prev", -1);
         } else if (ACTION_CMD_NEXT.equals(action)) {
             AndroidMediaPlugin.emitMediaAction("next", -1);
+        } else if (ACTION_CMD_REWIND.equals(action)) {
+            AndroidMediaPlugin.emitMediaAction("seekback", -1);
+        } else if (ACTION_CMD_FAST_FORWARD.equals(action)) {
+            AndroidMediaPlugin.emitMediaAction("seekforward", -1);
         } else if (ACTION_UPDATE.equals(action)) {
-            curTitle = intent.getStringExtra("title") != null ? intent.getStringExtra("title") : "XI Media Deck";
+            curTitle = intent.getStringExtra("title") != null ? intent.getStringExtra("title") : "SOWRA";
             curArtist = intent.getStringExtra("artist") != null ? intent.getStringExtra("artist") : "Local Media";
-            curAlbum = intent.getStringExtra("album") != null ? intent.getStringExtra("album") : "XI Deck";
+            curAlbum = intent.getStringExtra("album") != null ? intent.getStringExtra("album") : "SOWRA";
             curPlaying = intent.getBooleanExtra("isPlaying", false);
-            curDurationMs = Math.max(0L, (long) (intent.getDoubleExtra("durationSec", 0.0) * 1000.0));
-            curPositionMs = Math.max(0L, (long) (intent.getDoubleExtra("positionSec", 0.0) * 1000.0));
+            curDurationMs = Math.max(0L, intent.getLongExtra("durationMs",
+                (long)(intent.getDoubleExtra("durationSec", 0.0) * 1000.0)));
+            curPositionMs = Math.max(0L, intent.getLongExtra("positionMs",
+                (long)(intent.getDoubleExtra("positionSec", 0.0) * 1000.0)));
+            curArtworkPath = intent.getStringExtra("artworkPath") != null
+                ? intent.getStringExtra("artworkPath") : curArtworkPath;
             updateSessionAndNotification();
         }
         return START_STICKY;
@@ -135,10 +148,10 @@ public class MediaPlaybackService extends Service {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && notificationManager != null) {
             NotificationChannel ch = new NotificationChannel(
                 CHANNEL_ID,
-                "Media Playback Controls",
+                "SOWRA Media Controls",
                 NotificationManager.IMPORTANCE_LOW
             );
-            ch.setDescription("System lockscreen and notification media controls for XI Media Deck");
+            ch.setDescription("SOWRA lock-screen and notification playback controls");
             ch.setShowBadge(false);
             notificationManager.createNotificationChannel(ch);
         }
@@ -161,6 +174,20 @@ public class MediaPlaybackService extends Service {
         }
         if (coverBitmap != null) {
             meta.putBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART, coverBitmap);
+        }
+        if (loadedArtworkPath == null || !loadedArtworkPath.equals(curArtworkPath)) {
+            Bitmap newCover = loadArtwork(curArtworkPath);
+            if (newCover == null) newCover = BitmapFactory.decodeResource(getResources(), R.drawable.default_album_cover);
+            if (newCover != null) {
+                if (coverBitmap != null && coverBitmap != newCover) coverBitmap.recycle();
+                coverBitmap = newCover;
+            }
+            loadedArtworkPath = curArtworkPath;
+        }
+        if (coverBitmap != null) {
+            meta.putBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART, coverBitmap);
+            meta.putBitmap(MediaMetadata.METADATA_KEY_ART, coverBitmap);
+            meta.putBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON, coverBitmap);
         }
         mediaSession.setMetadata(meta.build());
 
@@ -206,22 +233,34 @@ public class MediaPlaybackService extends Service {
             actionPendingIntent(curPlaying ? ACTION_CMD_PAUSE : ACTION_CMD_PLAY, 11)
         ).build();
 
+        Notification.Action rewindAct = new Notification.Action.Builder(
+            Icon.createWithResource(this, android.R.drawable.ic_media_rew),
+            "Rewind 10 seconds",
+            actionPendingIntent(ACTION_CMD_REWIND, 12)
+        ).build();
+
         Notification.Action nextAct = new Notification.Action.Builder(
             Icon.createWithResource(this, android.R.drawable.ic_media_next),
-            "Forward",
-            actionPendingIntent(ACTION_CMD_NEXT, 12)
+            "Next track",
+            actionPendingIntent(ACTION_CMD_NEXT, 13)
+        ).build();
+
+        Notification.Action fastForwardAct = new Notification.Action.Builder(
+            Icon.createWithResource(this, android.R.drawable.ic_media_ff),
+            "Forward 10 seconds",
+            actionPendingIntent(ACTION_CMD_FAST_FORWARD, 14)
         ).build();
 
         Notification.Action rerunAct = new Notification.Action.Builder(
             Icon.createWithResource(this, android.R.drawable.ic_menu_revert),
             "Re-run",
-            actionPendingIntent(ACTION_CMD_RERUN, 13)
+            actionPendingIntent(ACTION_CMD_RERUN, 15)
         ).build();
 
         Notification.Action stopAct = new Notification.Action.Builder(
             Icon.createWithResource(this, android.R.drawable.ic_menu_close_clear_cancel),
             "Stop",
-            actionPendingIntent(ACTION_CMD_STOP, 14)
+            actionPendingIntent(ACTION_CMD_STOP, 16)
         ).build();
 
         Notification.Builder builder = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
@@ -240,12 +279,14 @@ public class MediaPlaybackService extends Service {
             .setVisibility(Notification.VISIBILITY_PUBLIC)
             .addAction(prevAct)
             .addAction(playPauseAct)
+            .addAction(rewindAct)
             .addAction(nextAct)
+            .addAction(fastForwardAct)
             .addAction(rerunAct)
             .addAction(stopAct)
             .setStyle(new Notification.MediaStyle()
                 .setMediaSession(mediaSession.getSessionToken())
-                .setShowActionsInCompactView(0, 1, 2));
+                .setShowActionsInCompactView(0, 1, 3));
 
         Notification notification = builder.build();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -253,6 +294,16 @@ public class MediaPlaybackService extends Service {
         } else {
             startForeground(NOTIFICATION_ID, notification);
         }
+    }
+
+    private Bitmap loadArtwork(String path) {
+        if (path == null || path.trim().isEmpty()) return null;
+        try {
+            String clean = path.startsWith("file://") ? path.substring(7) : path;
+            File file = new File(clean);
+            if (file.exists() && file.isFile()) return BitmapFactory.decodeFile(file.getAbsolutePath());
+        } catch (Exception ignored) {}
+        return null;
     }
 
     private void stopSelfAndNotification() {
